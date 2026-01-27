@@ -1,0 +1,2 @@
+Target dependency graph (1 target)
+Target 'THShared' in project 'Terminal Helper' (no dependencies)

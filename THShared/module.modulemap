@@ -1,0 +1,4 @@
+framework module THShared {
+    umbrella header "THShared.h"
+    export *
+}
