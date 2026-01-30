@@ -113,4 +113,15 @@
     return [self localizedStringForKey:@"execute_in_terminal"];
 }
 
++ (NSString *)supportContactEmail {
+    return [self isChineseLanguage] ? @"1275659412@qq.com" : @"sun17319461124@gmail.com";
+}
+
++ (NSString *)supportContactMessage {
+    if ([self isChineseLanguage]) {
+        return [NSString stringWithFormat:@"如使用过程中有任何问题请私信：%@", [self supportContactEmail]];
+    }
+    return [NSString stringWithFormat:@"If you have any questions, please email: %@", [self supportContactEmail]];
+}
+
 @end

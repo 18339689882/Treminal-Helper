@@ -18,6 +18,7 @@
 @property (nonatomic, strong) IBOutlet NSButton *addButton;
 @property (nonatomic, strong) IBOutlet NSButton *editButton;
 @property (nonatomic, strong) IBOutlet NSButton *deleteButton;
+@property (nonatomic, strong) NSTextField *supportContactLabel;
 
 - (IBAction)addCommand:(id)sender;
 - (IBAction)editCommand:(id)sender;

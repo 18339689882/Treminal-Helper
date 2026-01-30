@@ -8,6 +8,7 @@
 #import "ViewController.h"
 #import "THCommand.h"
 #import "THCommandManager.h"
+#import "THLocalization.h"
 
 @interface ViewController ()
 
@@ -158,6 +159,20 @@
     deleteButton.action = @selector(deleteCommand:);
     [self.view addSubview:deleteButton];
     self.deleteButton = deleteButton;
+
+    // Support contact label
+    NSTextField *supportContactLabel = [[NSTextField alloc] init];
+    supportContactLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    supportContactLabel.editable = NO;
+    supportContactLabel.selectable = YES;
+    supportContactLabel.bordered = NO;
+    supportContactLabel.drawsBackground = NO;
+    supportContactLabel.font = [NSFont systemFontOfSize:11 weight:NSFontWeightRegular];
+    supportContactLabel.textColor = [NSColor secondaryLabelColor];
+    supportContactLabel.stringValue = [THLocalization supportContactMessage];
+    supportContactLabel.alignment = NSTextAlignmentRight;
+    [self.view addSubview:supportContactLabel];
+    self.supportContactLabel = supportContactLabel;
     
     // Store references for constraints
     nameLabel.identifier = @"nameLabel";
@@ -172,6 +187,7 @@
     NSButton *addButton = self.addButton;
     NSButton *editButton = self.editButton;
     NSButton *deleteButton = self.deleteButton;
+    NSTextField *supportContactLabel = self.supportContactLabel;
     
     // Find labels
     NSTextField *nameLabel = nil;
@@ -222,6 +238,11 @@
         [deleteButton.leadingAnchor constraintEqualToAnchor:editButton.trailingAnchor constant:12],
         [deleteButton.widthAnchor constraintEqualToConstant:80],
         [deleteButton.bottomAnchor constraintEqualToAnchor:containerView.bottomAnchor constant:-20],
+
+        // Support contact label
+        [supportContactLabel.trailingAnchor constraintEqualToAnchor:containerView.trailingAnchor constant:-20],
+        [supportContactLabel.bottomAnchor constraintEqualToAnchor:containerView.bottomAnchor constant:-22],
+        [supportContactLabel.leadingAnchor constraintGreaterThanOrEqualToAnchor:deleteButton.trailingAnchor constant:12]
     ]];
 }
 

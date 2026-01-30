@@ -29,6 +29,10 @@ NS_ASSUME_NONNULL_BEGIN
 + (NSString *)cannotOpenTerminal;
 + (NSString *)executeInTerminal;
 
+// Support contact
++ (NSString *)supportContactEmail;
++ (NSString *)supportContactMessage;
+
 @end
 
 /// Convenience macro for localization
