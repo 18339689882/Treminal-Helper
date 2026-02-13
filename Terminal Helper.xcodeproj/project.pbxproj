@@ -292,7 +292,7 @@
 			mainGroup = FE8F73C22F1616AB00448E1B;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = FE8F73CC2F1616AB00448E1B /* Products */;
+			productRefGroup = FE8F73C22F1616AB00448E1B /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
