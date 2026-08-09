@@ -141,18 +141,14 @@
     // 获取当前 Finder 窗口的路径
     NSString *currentPath = [self getCurrentFinderPath];
     
-    if (currentPath) {
-        // 如果成功获取到 Finder 路径，在终端中执行
-        [self executeCommand:command inDirectory:currentPath];
-    } else {
-        // 如果无法获取 Finder 路径，显示提示
-        NSAlert *alert = [[NSAlert alloc] init];
-        alert.messageText = [THLocalization cannotGetFinderPath];
-        alert.informativeText = [THLocalization pleaseOpenFinderWindow];
-        alert.alertStyle = NSAlertStyleWarning;
-        [alert addButtonWithTitle:[THLocalization ok]];
-        [alert runModal];
+    if (!currentPath || currentPath.length == 0) {
+        // 如果无法获取 Finder 路径，使用用户的Home目录
+        currentPath = NSHomeDirectory();
+        NSLog(@"AppDelegate: No Finder window found, using home directory: %@", currentPath);
     }
+    
+    // 在终端中执行
+    [self executeCommand:command inDirectory:currentPath];
 }
 
 - (void)quitMenuItemClicked:(id)sender {
@@ -164,39 +160,50 @@
 - (void)executeCommand:(THCommand *)command inDirectory:(NSString *)directoryPath {
     NSLog(@"AppDelegate: Executing command '%@' in directory: %@", command.name, directoryPath);
     
-    // 使用NSWorkspace启动Terminal并等待它运行
+    // 检查Terminal是否已经在运行
     NSWorkspace *workspace = [NSWorkspace sharedWorkspace];
-    NSURL *terminalURL = [workspace URLForApplicationWithBundleIdentifier:@"com.apple.Terminal"];
+    NSArray<NSRunningApplication *> *runningApps = [workspace runningApplications];
+    BOOL terminalRunning = NO;
     
-    if (!terminalURL) {
-        NSLog(@"AppDelegate: Terminal.app not found");
-        return;
-    }
-    
-    NSError *launchError = nil;
-    NSRunningApplication *terminalApp = [workspace launchApplicationAtURL:terminalURL
-                                                                   options:NSWorkspaceLaunchDefault
-                                                             configuration:@{}
-                                                                     error:&launchError];
-    
-    if (launchError) {
-        NSLog(@"AppDelegate: Failed to launch Terminal: %@", launchError);
-        return;
-    }
-    
-    NSLog(@"AppDelegate: Terminal launched, waiting for it to be ready...");
-    
-    // 等待Terminal完全启动（最多3秒）
-    for (int i = 0; i < 30; i++) {
-        if (terminalApp.isActive || i > 10) {
+    for (NSRunningApplication *app in runningApps) {
+        if ([app.bundleIdentifier isEqualToString:@"com.apple.Terminal"]) {
+            terminalRunning = YES;
+            NSLog(@"AppDelegate: Terminal is already running");
             break;
         }
-        [NSThread sleepForTimeInterval:0.1];
     }
     
-    NSLog(@"AppDelegate: Terminal is ready, executing AppleScript...");
+    // 如果Terminal没有运行，先启动它
+    if (!terminalRunning) {
+        NSLog(@"AppDelegate: Launching Terminal...");
+        NSURL *terminalURL = [workspace URLForApplicationWithBundleIdentifier:@"com.apple.Terminal"];
+        
+        if (!terminalURL) {
+            NSLog(@"AppDelegate: Terminal.app not found");
+            return;
+        }
+        
+        NSError *launchError = nil;
+        NSRunningApplication *terminalApp = [workspace launchApplicationAtURL:terminalURL
+                                                                       options:NSWorkspaceLaunchDefault
+                                                                 configuration:@{}
+                                                                         error:&launchError];
+        
+        if (launchError) {
+            NSLog(@"AppDelegate: Failed to launch Terminal: %@", launchError);
+            return;
+        }
+        
+        // 等待Terminal完全启动（最多1秒）
+        for (int i = 0; i < 10; i++) {
+            if (terminalApp.isActive) {
+                break;
+            }
+            [NSThread sleepForTimeInterval:0.1];
+        }
+    }
     
-    // 使用NSAppleScript而不是osascript命令
+    // 使用NSAppleScript执行命令
     NSString *script = [NSString stringWithFormat:
         @"tell application \"Terminal\"\n"
         @"    do script \"cd '%@' && %@\"\n"
@@ -292,39 +299,50 @@
 - (void)executeCommandString:(NSString *)commandString inDirectory:(NSString *)directoryPath {
     NSLog(@"Terminal Helper: Executing command: %@ in directory: %@", commandString, directoryPath);
     
-    // 使用NSWorkspace启动Terminal
+    // 检查Terminal是否已经在运行
     NSWorkspace *workspace = [NSWorkspace sharedWorkspace];
-    NSURL *terminalURL = [workspace URLForApplicationWithBundleIdentifier:@"com.apple.Terminal"];
+    NSArray<NSRunningApplication *> *runningApps = [workspace runningApplications];
+    BOOL terminalRunning = NO;
     
-    if (!terminalURL) {
-        NSLog(@"Terminal Helper: Terminal.app not found");
-        return;
-    }
-    
-    NSError *launchError = nil;
-    NSRunningApplication *terminalApp = [workspace launchApplicationAtURL:terminalURL
-                                                                   options:NSWorkspaceLaunchDefault
-                                                             configuration:@{}
-                                                                     error:&launchError];
-    
-    if (launchError) {
-        NSLog(@"Terminal Helper: Failed to launch Terminal: %@", launchError);
-        return;
-    }
-    
-    NSLog(@"Terminal Helper: Terminal launched, waiting for it to be ready...");
-    
-    // 等待Terminal完全启动
-    for (int i = 0; i < 30; i++) {
-        if (terminalApp.isActive || i > 10) {
+    for (NSRunningApplication *app in runningApps) {
+        if ([app.bundleIdentifier isEqualToString:@"com.apple.Terminal"]) {
+            terminalRunning = YES;
+            NSLog(@"Terminal Helper: Terminal is already running");
             break;
         }
-        [NSThread sleepForTimeInterval:0.1];
     }
     
-    NSLog(@"Terminal Helper: Terminal is ready, executing command...");
+    // 如果Terminal没有运行，先启动它
+    if (!terminalRunning) {
+        NSLog(@"Terminal Helper: Launching Terminal...");
+        NSURL *terminalURL = [workspace URLForApplicationWithBundleIdentifier:@"com.apple.Terminal"];
+        
+        if (!terminalURL) {
+            NSLog(@"Terminal Helper: Terminal.app not found");
+            return;
+        }
+        
+        NSError *launchError = nil;
+        NSRunningApplication *terminalApp = [workspace launchApplicationAtURL:terminalURL
+                                                                       options:NSWorkspaceLaunchDefault
+                                                                 configuration:@{}
+                                                                         error:&launchError];
+        
+        if (launchError) {
+            NSLog(@"Terminal Helper: Failed to launch Terminal: %@", launchError);
+            return;
+        }
+        
+        // 等待Terminal完全启动（最多1秒）
+        for (int i = 0; i < 10; i++) {
+            if (terminalApp.isActive) {
+                break;
+            }
+            [NSThread sleepForTimeInterval:0.1];
+        }
+    }
     
-    // 使用NSAppleScript而不是osascript命令
+    // 使用NSAppleScript执行命令
     NSString *script = [NSString stringWithFormat:
         @"tell application \"Terminal\"\n"
         @"    do script \"cd '%@' && %@\"\n"
