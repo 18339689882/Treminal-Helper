@@ -15,10 +15,6 @@ static NSString * const kTHCommandCommandStringKey = @"commandString";
 static NSString * const kTHCommandIsPresetKey = @"isPreset";
 static NSString * const kTHCommandSortOrderKey = @"sortOrder";
 
-#pragma mark - Preset Command Identifiers
-
-static NSString * const kTHPresetPodInstallIdentifier = @"preset.pod-install";
-
 @interface THCommand ()
 
 @property (nonatomic, copy, readwrite) NSString *identifier;
@@ -56,19 +52,6 @@ static NSString * const kTHPresetPodInstallIdentifier = @"preset.pod-install";
         _sortOrder = [coder decodeIntegerForKey:kTHCommandSortOrderKey];
     }
     return self;
-}
-
-#pragma mark - Preset Commands
-
-+ (instancetype)presetPodInstall {
-    THCommand *command = [[THCommand alloc] initWithName:@"Pod Install" 
-                                           commandString:@"pod install" 
-                                                isPreset:YES];
-    if (command) {
-        command->_identifier = kTHPresetPodInstallIdentifier;
-        command->_sortOrder = 0;
-    }
-    return command;
 }
 
 #pragma mark - Initialization

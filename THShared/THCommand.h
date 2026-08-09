@@ -33,14 +33,6 @@ NS_ASSUME_NONNULL_BEGIN
 /// Sort order for display in lists
 @property (nonatomic, assign) NSInteger sortOrder;
 
-#pragma mark - Preset Commands
-
-/**
- * Creates the preset "pod install" command.
- * @return A new THCommand instance configured for pod install.
- */
-+ (instancetype)presetPodInstall;
-
 #pragma mark - Initialization
 
 /**

@@ -240,21 +240,14 @@
     NSLog(@"THCommandManager: Loading default commands");
     [self.mutableCommands removeAllObjects];
     
-    // Add preset commands
-    THCommand *podInstall = [THCommand presetPodInstall];
-    if (podInstall) {
-        [self.mutableCommands addObject:podInstall];
-        NSLog(@"THCommandManager: Added preset command: %@", podInstall.name);
-    }
-    
-    // Add pod repo update command
-    THCommand *podRepoUpdate = [[THCommand alloc] initWithName:@"Pod repo update"
-                                                 commandString:@"pod repo update"
-                                                      isPreset:YES];
-    if (podRepoUpdate) {
-        podRepoUpdate.sortOrder = 1;
-        [self.mutableCommands addObject:podRepoUpdate];
-        NSLog(@"THCommandManager: Added preset command: %@", podRepoUpdate.name);
+    // Add preset command: Open Terminal Here
+    THCommand *openTerminal = [[THCommand alloc] initWithName:@"在此处打开终端"
+                                                commandString:@"clear"
+                                                     isPreset:YES];
+    if (openTerminal) {
+        openTerminal.sortOrder = 0;
+        [self.mutableCommands addObject:openTerminal];
+        NSLog(@"THCommandManager: Added preset command: %@", openTerminal.name);
     }
     
     NSLog(@"THCommandManager: Loaded %lu default commands", (unsigned long)self.mutableCommands.count);
@@ -264,20 +257,23 @@
 }
 
 - (void)ensurePresetCommandsExist {
-    // Check if pod install preset exists
-    BOOL hasPodInstall = NO;
+    // Check if "Open Terminal Here" preset exists
+    BOOL hasOpenTerminal = NO;
     for (THCommand *command in self.mutableCommands) {
-        if (command.isPreset && [command.identifier isEqualToString:@"preset.pod-install"]) {
-            hasPodInstall = YES;
+        if (command.isPreset && [command.commandString isEqualToString:@"clear"]) {
+            hasOpenTerminal = YES;
             break;
         }
     }
     
-    // Add missing preset commands
-    if (!hasPodInstall) {
-        THCommand *podInstall = [THCommand presetPodInstall];
-        if (podInstall) {
-            [self.mutableCommands insertObject:podInstall atIndex:0];
+    // Add missing preset command
+    if (!hasOpenTerminal) {
+        THCommand *openTerminal = [[THCommand alloc] initWithName:@"在此处打开终端"
+                                                    commandString:@"clear"
+                                                         isPreset:YES];
+        if (openTerminal) {
+            openTerminal.sortOrder = 0;
+            [self.mutableCommands insertObject:openTerminal atIndex:0];
         }
     }
 }
