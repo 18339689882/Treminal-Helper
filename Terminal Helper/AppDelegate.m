@@ -142,9 +142,9 @@
     NSString *currentPath = [self getCurrentFinderPath];
     
     if (!currentPath || currentPath.length == 0) {
-        // 如果无法获取 Finder 路径，使用用户的Home目录
-        currentPath = NSHomeDirectory();
-        NSLog(@"AppDelegate: No Finder window found, using home directory: %@", currentPath);
+        // 如果无法获取 Finder 路径，使用真实的用户Home目录
+        currentPath = [NSString stringWithFormat:@"/Users/%@", NSUserName()];
+        NSLog(@"AppDelegate: No Finder window found, using user home directory: %@", currentPath);
     }
     
     // 在终端中执行
@@ -378,44 +378,41 @@
 
 /**
  * 获取当前 Finder 窗口的路径
- * 使用 osascript 命令行工具执行 AppleScript
+ * 优先获取选中的文件夹，否则获取窗口当前路径
  */
 - (NSString *)getCurrentFinderPath {
-    // 使用 osascript 命令行工具，避免 NSAppleScript 的权限问题
-    NSTask *task = [[NSTask alloc] init];
-    task.launchPath = @"/usr/bin/osascript";
-    task.arguments = @[@"-e",
+    // 使用NSAppleScript而不是osascript命令，避免权限问题
+    NSString *script = 
         @"tell application \"Finder\"\n"
         @"    if (count of Finder windows) > 0 then\n"
-        @"        set currentFolder to (target of front Finder window) as alias\n"
-        @"        return POSIX path of currentFolder\n"
+        @"        set selectedItems to selection\n"
+        @"        if (count of selectedItems) > 0 then\n"
+        @"            set firstItem to item 1 of selectedItems\n"
+        @"            if kind of firstItem is \"文件夹\" or kind of firstItem is \"Folder\" then\n"
+        @"                return POSIX path of (firstItem as alias)\n"
+        @"            else\n"
+        @"                set currentFolder to (container of firstItem) as alias\n"
+        @"                return POSIX path of currentFolder\n"
+        @"            end if\n"
+        @"        else\n"
+        @"            set currentFolder to (target of front Finder window) as alias\n"
+        @"            return POSIX path of currentFolder\n"
+        @"        end if\n"
         @"    else\n"
         @"        return \"\"\n"
         @"    end if\n"
-        @"end tell"];
+        @"end tell";
     
-    NSPipe *outputPipe = [NSPipe pipe];
-    NSPipe *errorPipe = [NSPipe pipe];
-    task.standardOutput = outputPipe;
-    task.standardError = errorPipe;
+    NSAppleScript *appleScript = [[NSAppleScript alloc] initWithSource:script];
+    NSDictionary *errorDict = nil;
+    NSAppleEventDescriptor *result = [appleScript executeAndReturnError:&errorDict];
     
-    @try {
-        [task launch];
-        [task waitUntilExit];
-    } @catch (NSException *exception) {
-        NSLog(@"获取 Finder 路径失败: %@", exception.reason);
+    if (errorDict) {
+        NSLog(@"AppDelegate: Failed to get Finder path: %@", errorDict);
         return nil;
     }
     
-    if (task.terminationStatus != 0) {
-        NSData *errorData = [[errorPipe fileHandleForReading] readDataToEndOfFile];
-        NSString *errorStr = [[NSString alloc] initWithData:errorData encoding:NSUTF8StringEncoding];
-        NSLog(@"osascript 执行失败，退出码: %d, 错误: %@", task.terminationStatus, errorStr);
-        return nil;
-    }
-    
-    NSData *outputData = [[outputPipe fileHandleForReading] readDataToEndOfFile];
-    NSString *path = [[NSString alloc] initWithData:outputData encoding:NSUTF8StringEncoding];
+    NSString *path = [result stringValue];
     
     // 去除换行符和空白
     path = [path stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
@@ -425,6 +422,7 @@
         if ([path hasSuffix:@"/"]) {
             path = [path substringToIndex:path.length - 1];
         }
+        NSLog(@"AppDelegate: Got Finder path: %@", path);
         return path;
     }
     
