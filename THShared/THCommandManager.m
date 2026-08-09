@@ -178,7 +178,7 @@
 - (void)saveCommands {
     NSUserDefaults *sharedDefaults = THSharedUserDefaults();
     if (!sharedDefaults) {
-        NSLog(@"Error: Could not access shared UserDefaults for App Group");
+        NSLog(@"Error: Could not access UserDefaults");
         return;
     }
     
@@ -195,12 +195,14 @@
     
     [sharedDefaults setObject:commandsData forKey:THUserDefaultsCommandsKey];
     [sharedDefaults synchronize];
+    
+    NSLog(@"THCommandManager: Saved %lu commands to storage", (unsigned long)self.mutableCommands.count);
 }
 
 - (void)loadCommands {
     NSUserDefaults *sharedDefaults = THSharedUserDefaults();
     if (!sharedDefaults) {
-        NSLog(@"Error: Could not access shared UserDefaults for App Group");
+        NSLog(@"Error: Could not access UserDefaults");
         [self loadDefaultCommands];
         return;
     }
@@ -208,6 +210,7 @@
     NSData *commandsData = [sharedDefaults objectForKey:THUserDefaultsCommandsKey];
     
     if (!commandsData) {
+        NSLog(@"THCommandManager: No saved commands found, loading defaults");
         // First launch - load default preset commands
         [self loadDefaultCommands];
         return;
@@ -227,19 +230,34 @@
     }
     
     self.mutableCommands = loadedCommands;
+    NSLog(@"THCommandManager: Loaded %lu commands from storage", (unsigned long)self.mutableCommands.count);
     
     // Ensure preset commands are present (in case they were missing)
     [self ensurePresetCommandsExist];
 }
 
 - (void)loadDefaultCommands {
+    NSLog(@"THCommandManager: Loading default commands");
     [self.mutableCommands removeAllObjects];
     
     // Add preset commands
     THCommand *podInstall = [THCommand presetPodInstall];
     if (podInstall) {
         [self.mutableCommands addObject:podInstall];
+        NSLog(@"THCommandManager: Added preset command: %@", podInstall.name);
     }
+    
+    // Add pod repo update command
+    THCommand *podRepoUpdate = [[THCommand alloc] initWithName:@"Pod repo update"
+                                                 commandString:@"pod repo update"
+                                                      isPreset:YES];
+    if (podRepoUpdate) {
+        podRepoUpdate.sortOrder = 1;
+        [self.mutableCommands addObject:podRepoUpdate];
+        NSLog(@"THCommandManager: Added preset command: %@", podRepoUpdate.name);
+    }
+    
+    NSLog(@"THCommandManager: Loaded %lu default commands", (unsigned long)self.mutableCommands.count);
     
     // Save the default commands
     [self saveCommands];

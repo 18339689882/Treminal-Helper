@@ -26,6 +26,10 @@
         _commandManager = [THCommandManager sharedManager];
         _commandExecutor = [[THCommandExecutor alloc] init];
         
+        // Force load commands
+        [_commandManager loadCommands];
+        NSLog(@"FinderSync: Initialized with %lu commands", (unsigned long)_commandManager.allCommands.count);
+        
         // Monitor the root directory for Finder Sync
         // This enables the extension for all directories
         [FIFinderSyncController defaultController].directoryURLs = [NSSet setWithObject:[NSURL fileURLWithPath:@"/"]];
@@ -90,7 +94,9 @@
 #pragma mark - Menu Generation
 
 - (NSMenu *)menuForMenuKind:(FIMenuKind)menuKind {
+    NSLog(@"==========================================");
     NSLog(@"FinderSync: menuForMenuKind called with kind: %ld", (long)menuKind);
+    NSLog(@"==========================================");
     
     // This method is called when the user right-clicks in Finder
     if (menuKind == FIMenuKindContextualMenuForItems || menuKind == FIMenuKindContextualMenuForContainer) {
@@ -99,7 +105,8 @@
         // Get all commands from the command manager and cache them
         self.cachedCommands = [self.commandManager.allCommands copy];
         
-        NSLog(@"FinderSync: Building menu with %lu commands", (unsigned long)self.cachedCommands.count);
+        NSLog(@"FinderSync: Command manager has %lu commands", (unsigned long)self.commandManager.allCommands.count);
+        NSLog(@"FinderSync: Building menu with %lu cached commands", (unsigned long)self.cachedCommands.count);
         
         if (self.cachedCommands.count == 0) {
             NSLog(@"FinderSync: WARNING - No commands available!");
@@ -110,28 +117,39 @@
             // Add menu items for each command using tag to identify
             for (NSUInteger i = 0; i < self.cachedCommands.count; i++) {
                 THCommand *command = self.cachedCommands[i];
-                NSLog(@"FinderSync: Adding menu item for command: %@ (tag: %lu)", command.name, (unsigned long)i);
+                NSLog(@"FinderSync: Adding menu item #%lu: %@ (tag: %lu)", (unsigned long)i, command.name, (unsigned long)i);
+                
                 NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:command.name
                                                               action:@selector(executeCommand:)
                                                        keyEquivalent:@""];
                 [item setTarget:self];
                 [item setTag:i];  // Use tag instead of representedObject
+                [item setEnabled:YES];
+                
+                NSLog(@"FinderSync: Menu item created - title: %@, target: %@, action: %@, tag: %ld, enabled: %d",
+                      item.title, item.target, NSStringFromSelector(item.action), (long)item.tag, item.isEnabled);
+                
                 [menu addItem:item];
             }
         }
         
         NSLog(@"FinderSync: Menu created with %ld items", (long)menu.numberOfItems);
+        NSLog(@"==========================================");
         return menu;
     }
     
-    NSLog(@"FinderSync: menuKind not supported, returning nil");
+    NSLog(@"FinderSync: menuKind %ld not supported, returning nil", (long)menuKind);
     return nil;
 }
 
 #pragma mark - Command Execution
 
 - (void)executeCommand:(NSMenuItem *)sender {
+    NSLog(@"==========================================");
     NSLog(@"FinderSync: executeCommand called");
+    NSLog(@"FinderSync: MenuItem tag: %ld", (long)sender.tag);
+    NSLog(@"FinderSync: Cached commands count: %lu", (unsigned long)self.cachedCommands.count);
+    NSLog(@"==========================================");
     
     // Get command from cached array using tag
     NSInteger tag = sender.tag;
@@ -146,7 +164,8 @@
         return;
     }
     
-    NSLog(@"FinderSync: Command name: %@, commandString: %@", command.name, command.commandString);
+    NSLog(@"FinderSync: Command name: %@", command.name);
+    NSLog(@"FinderSync: Command string: %@", command.commandString);
     
     // Get the selected folder path
     NSString *folderPath = [self getSelectedFolderPath];
@@ -163,10 +182,28 @@
     
     if (!containerURL) {
         NSLog(@"FinderSync: ERROR - Could not get container URL");
+        NSLog(@"FinderSync: App Group may not be configured properly");
         return;
     }
     
+    NSLog(@"FinderSync: Container URL: %@", containerURL.path);
+    
+    // 确保容器目录存在
+    if (![fileManager fileExistsAtPath:containerURL.path]) {
+        NSError *createError = nil;
+        BOOL created = [fileManager createDirectoryAtURL:containerURL
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:&createError];
+        if (!created) {
+            NSLog(@"FinderSync: ERROR - Could not create container directory: %@", createError);
+            return;
+        }
+        NSLog(@"FinderSync: Created container directory");
+    }
+    
     NSURL *commandFileURL = [containerURL URLByAppendingPathComponent:@"pending_command.plist"];
+    NSLog(@"FinderSync: Command file URL: %@", commandFileURL.path);
     
     NSDictionary *commandData = @{
         @"commandString": command.commandString,
@@ -184,13 +221,29 @@
         return;
     }
     
+    NSLog(@"FinderSync: Serialized plist data, size: %lu bytes", (unsigned long)plistData.length);
+    
     BOOL success = [plistData writeToURL:commandFileURL options:NSDataWritingAtomic error:&error];
     if (!success) {
         NSLog(@"FinderSync: ERROR - Failed to write command file: %@", error);
+        NSLog(@"FinderSync: Error domain: %@, code: %ld", error.domain, (long)error.code);
         return;
     }
     
-    NSLog(@"FinderSync: Command written to shared file: %@", commandFileURL.path);
+    NSLog(@"FinderSync: SUCCESS - Command written to shared file");
+    
+    // 验证文件是否存在
+    if ([fileManager fileExistsAtPath:commandFileURL.path]) {
+        NSDictionary *attributes = [fileManager attributesOfItemAtPath:commandFileURL.path error:nil];
+        NSLog(@"FinderSync: VERIFIED - File exists at: %@", commandFileURL.path);
+        NSLog(@"FinderSync: File size: %@ bytes", attributes[NSFileSize]);
+    } else {
+        NSLog(@"FinderSync: WARNING - File does not exist after write!");
+    }
+    
+    NSLog(@"==========================================");
+    NSLog(@"FinderSync: executeCommand END");
+    NSLog(@"==========================================");
 }
 
 #pragma mark - Helper Methods

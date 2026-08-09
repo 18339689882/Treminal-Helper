@@ -162,27 +162,63 @@
 #pragma mark - Command Execution
 
 - (void)executeCommand:(THCommand *)command inDirectory:(NSString *)directoryPath {
-    // 直接使用 osascript 打开终端执行命令，避免 NSAppleScript 权限问题
-    NSTask *task = [[NSTask alloc] init];
-    task.launchPath = @"/usr/bin/osascript";
-    task.arguments = @[
-        @"-e", @"tell application \"Terminal\" to activate",
-        @"-e", [NSString stringWithFormat:@"tell application \"Terminal\" to do script \"cd '%@' && %@\"", 
-                directoryPath, command.commandString]
-    ];
+    NSLog(@"AppDelegate: Executing command '%@' in directory: %@", command.name, directoryPath);
     
-    @try {
-        [task launch];
-        NSLog(@"命令已发送到终端: %@ (目录: %@)", command.commandString, directoryPath);
-    } @catch (NSException *exception) {
-        NSLog(@"执行命令失败: %@", exception.reason);
+    // 使用NSWorkspace启动Terminal并等待它运行
+    NSWorkspace *workspace = [NSWorkspace sharedWorkspace];
+    NSURL *terminalURL = [workspace URLForApplicationWithBundleIdentifier:@"com.apple.Terminal"];
+    
+    if (!terminalURL) {
+        NSLog(@"AppDelegate: Terminal.app not found");
+        return;
+    }
+    
+    NSError *launchError = nil;
+    NSRunningApplication *terminalApp = [workspace launchApplicationAtURL:terminalURL
+                                                                   options:NSWorkspaceLaunchDefault
+                                                             configuration:@{}
+                                                                     error:&launchError];
+    
+    if (launchError) {
+        NSLog(@"AppDelegate: Failed to launch Terminal: %@", launchError);
+        return;
+    }
+    
+    NSLog(@"AppDelegate: Terminal launched, waiting for it to be ready...");
+    
+    // 等待Terminal完全启动（最多3秒）
+    for (int i = 0; i < 30; i++) {
+        if (terminalApp.isActive || i > 10) {
+            break;
+        }
+        [NSThread sleepForTimeInterval:0.1];
+    }
+    
+    NSLog(@"AppDelegate: Terminal is ready, executing AppleScript...");
+    
+    // 使用NSAppleScript而不是osascript命令
+    NSString *script = [NSString stringWithFormat:
+        @"tell application \"Terminal\"\n"
+        @"    do script \"cd '%@' && %@\"\n"
+        @"    activate\n"
+        @"end tell",
+        directoryPath, command.commandString];
+    
+    NSAppleScript *appleScript = [[NSAppleScript alloc] initWithSource:script];
+    NSDictionary *errorDict = nil;
+    NSAppleEventDescriptor *result = [appleScript executeAndReturnError:&errorDict];
+    
+    if (errorDict) {
+        NSLog(@"AppDelegate: AppleScript error: %@", errorDict);
         
         NSAlert *alert = [[NSAlert alloc] init];
         alert.messageText = [THLocalization executionFailed];
-        alert.informativeText = exception.reason ?: [THLocalization cannotOpenTerminal];
+        alert.informativeText = errorDict[NSAppleScriptErrorMessage] ?: [THLocalization cannotOpenTerminal];
         alert.alertStyle = NSAlertStyleCritical;
         [alert addButtonWithTitle:[THLocalization ok]];
         [alert runModal];
+    } else {
+        NSLog(@"AppDelegate: Command executed successfully, result: %@", result);
     }
 }
 
@@ -254,19 +290,69 @@
  * 执行命令字符串
  */
 - (void)executeCommandString:(NSString *)commandString inDirectory:(NSString *)directoryPath {
-    NSTask *task = [[NSTask alloc] init];
-    task.launchPath = @"/usr/bin/osascript";
-    task.arguments = @[
-        @"-e", @"tell application \"Terminal\" to activate",
-        @"-e", [NSString stringWithFormat:@"tell application \"Terminal\" to do script \"cd '%@' && %@\"", 
-                directoryPath, commandString]
-    ];
+    NSLog(@"Terminal Helper: Executing command: %@ in directory: %@", commandString, directoryPath);
     
-    @try {
-        [task launch];
-        NSLog(@"Terminal Helper: Command sent to Terminal: %@ (directory: %@)", commandString, directoryPath);
-    } @catch (NSException *exception) {
-        NSLog(@"Terminal Helper: Failed to execute command: %@", exception.reason);
+    // 使用NSWorkspace启动Terminal
+    NSWorkspace *workspace = [NSWorkspace sharedWorkspace];
+    NSURL *terminalURL = [workspace URLForApplicationWithBundleIdentifier:@"com.apple.Terminal"];
+    
+    if (!terminalURL) {
+        NSLog(@"Terminal Helper: Terminal.app not found");
+        return;
+    }
+    
+    NSError *launchError = nil;
+    NSRunningApplication *terminalApp = [workspace launchApplicationAtURL:terminalURL
+                                                                   options:NSWorkspaceLaunchDefault
+                                                             configuration:@{}
+                                                                     error:&launchError];
+    
+    if (launchError) {
+        NSLog(@"Terminal Helper: Failed to launch Terminal: %@", launchError);
+        return;
+    }
+    
+    NSLog(@"Terminal Helper: Terminal launched, waiting for it to be ready...");
+    
+    // 等待Terminal完全启动
+    for (int i = 0; i < 30; i++) {
+        if (terminalApp.isActive || i > 10) {
+            break;
+        }
+        [NSThread sleepForTimeInterval:0.1];
+    }
+    
+    NSLog(@"Terminal Helper: Terminal is ready, executing command...");
+    
+    // 使用NSAppleScript而不是osascript命令
+    NSString *script = [NSString stringWithFormat:
+        @"tell application \"Terminal\"\n"
+        @"    do script \"cd '%@' && %@\"\n"
+        @"    activate\n"
+        @"end tell",
+        directoryPath, commandString];
+    
+    NSLog(@"Terminal Helper: AppleScript:\n%@", script);
+    
+    NSAppleScript *appleScript = [[NSAppleScript alloc] initWithSource:script];
+    NSDictionary *errorDict = nil;
+    NSAppleEventDescriptor *result = [appleScript executeAndReturnError:&errorDict];
+    
+    if (errorDict) {
+        NSLog(@"Terminal Helper: AppleScript error: %@", errorDict);
+        
+        // 如果是权限错误，提示用户
+        NSNumber *errorNumber = errorDict[NSAppleScriptErrorNumber];
+        if (errorNumber && ([errorNumber integerValue] == -1743 || [errorNumber integerValue] == -10004)) {
+            NSAlert *alert = [[NSAlert alloc] init];
+            alert.messageText = @"需要授权";
+            alert.informativeText = @"请在系统设置 → 隐私与安全性 → 自动化中，允许Terminal Helper控制终端。";
+            alert.alertStyle = NSAlertStyleWarning;
+            [alert addButtonWithTitle:@"好的"];
+            [alert runModal];
+        }
+    } else {
+        NSLog(@"Terminal Helper: Command executed successfully, result: %@", result);
     }
 }
 
